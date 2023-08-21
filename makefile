@@ -1,4 +1,3 @@
- 
 CC	= mpicxx
 
 FSI_OBJSC  = fe_initialization.o fe_boundary_cond.o fb_beam.o \
@@ -23,13 +22,13 @@ FSI_SOURCEC  = fe_initialization.c fe_boundary_cond.c fb_beam.c \
 PETSC=$(PETSC_DIR)
 PETSCINC=-I$(PETSC)/include
 PETSCLIB=$(PETSC)/lib
-PETSCARCHINC=-I$(PETSC)/thunder-debug/include
-EIGEN_CPPFLAGS = -I/home/dathi/Particle_Tracking/eigen
+PETSCARCHINC=-I$(PETSC)/linux-gnu-cxx-debug/include
+EIGEN_CPPFLAGS = -I/mmfs1/home/dathi.snvrajasekhar/software/cflab-getting-started/eigen
 
 #PETSCINC=-I/gpfs/home/trungle/Petsc/petsc-3.1-p8/include
 #MPIINC=-I/cm/shared/apps/mvapich2/gcc/64/2.1/include
 #PETSCARCHINC=-I/gpfs/home/trungle/Petsc/petsc-3.1-p8/linux-debug/include
-#LIBDIR=-L$(PETSCLIB) -L./ 
+LIBDIR=-L$(PETSCLIB) -L./ 
 
 #EIGEN_CPPFLAGS = -I/gpfs/home/trungle/Tools/eigen_lib
 

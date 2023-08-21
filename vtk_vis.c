@@ -109,10 +109,7 @@ typedef struct {
 
 	PetscReal  *dpdcsi,*dpdeta,*dpdzet;
 	PetscReal  *dpdx,*dpdy,*dpdz,*delp;
-	PetscReal  *Fpx, *Fpy, *Fpz, *Fp, *Fbx,*Fby,*Fbz;
-	PetscReal  v_scale;
-	PetscReal  density_particle;
-	PetscReal  density_fluid;
+	PetscReal  *Fpx, *Fpy, *Fpz, *Fp, *Fb;
 	//Vec ParVel;
 	//Vec ParLoc;
 } PT;
@@ -2770,12 +2767,6 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 	PetscReal   ***dist;
 	PetscInt    *ip, *jp, *kp;
 	PetscReal   *dcutoff;
-	PetscReal   v_scale;
-	PetscReal   density_particle;
-	PetscReal   density_fluid;
-	PetscReal   diameter_particle;
-	PetscReal   mass_particle;
-	PetscReal   T_physical;
 	//PetscReal   *c,*e,*z;
 
 		
@@ -2783,12 +2774,11 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
        	PetscReal   *dpdcsi, *dpdeta, *dpdzet;
 	//Cmpnts	    ***dpdcsi, ***dpdeta, ***dpdzet;
 	PetscReal    *dpdx, *dpdy, *dpdz, *delp;
-	PetscReal   *Fpx, *Fpy, *Fpz,*Fp, *Fbx, *Fby, *Fbz;
-	PetscReal   *acceleration_x, *acceleration_y, *acceleration_z;
+	PetscReal   *Fpx, *Fpy, *Fpz,*Fp, *Fb;
 	PetscReal   *Vp, *Re_s, *CD, rho;
 
 	PetscInt    speedscale, starting_k;
-	//PetscInt    diameter_particle, density_particle, density_fluid, gravity, velocity_fluid, viscosity_fluid;
+	PetscInt    diameter_particle, density_particle, density_fluid, gravity, velocity_fluid, viscosity_fluid;
 	
 	// Velocity scale = 3.937 m/s
 	// Time scale = 6.452e-3 s
@@ -2857,29 +2847,12 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 		starting_k      = user[bi].starting_k;
 		nondtsteps      = user[bi].dt; // Extract nondimensional timestep
 		NUM_OF_PARTICLE = user[bi].num_of_particle;
-
-
-
-
-		//diameter_particle = user[bi].dp;
-		
-
-
-
-		//viscosity_fluid = user[bi].vis;
-		//density_fluid = user[bi].rho;
-		//density_particle = user[bi].rho_p;
-		//gravity = user[bi].g;
-		//velocity_fluid = user[bi].Vf;
-
-		v_scale = 5.5;
-		density_particle = 1602;
-		diameter_particle = 200e-6;
-		density_fluid = 10e-5;
-		mass_particle = 6.7104e-9;
-		T_physical = 3.694e-4;
-
-		PetscPrintf(PETSC_COMM_WORLD, "density_fluid = %e \n", density_fluid);
+		diameter_particle = user[bi].dp;
+		viscosity_fluid = user[bi].vis;
+		density_fluid = user[bi].rho;
+		density_particle = user[bi].rho_p;
+		gravity = user[bi].g;
+		velocity_fluid = user[bi].Vf;
 
 
 		PetscPrintf(PETSC_COMM_WORLD, "Timestep = %e \n", nondtsteps);
@@ -2936,12 +2909,7 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fpz);
 		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fp);
 
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fbx);
-
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fby);
-
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fbz);
-		
+		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fb);
 
 
 
@@ -3044,7 +3012,6 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 			PetscInt    min=0, max=10;
 			PetscInt    kpini=starting_k, jpini, ipini;
 
-			//srand(particle*10+kpini);
 			srand(particle+kpini);
 
 			//srand(particle+jpini);
@@ -3085,12 +3052,10 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 			zploc[particle] = zpini[particle];
 
 
-			// Particle velocity(for massless)
-			//uploc[particle] = ucat[kpini][jpini][ipini].x + random_vel_x;
-			//vploc[particle] = ucat[kpini][jpini][ipini].y + random_vel_y;
-			//wploc[particle] = ucat[kpini][jpini][ipini].z + random_vel_z;
-
-
+			// Particle velocity
+			uploc[particle] = ucat[kpini][jpini][ipini].x + random_vel_x;
+			vploc[particle] = ucat[kpini][jpini][ipini].y + random_vel_y;
+			wploc[particle] = ucat[kpini][jpini][ipini].z + random_vel_z;
 
 			// Particle Pressure
 			presuure_ploc_x[particle] = pr[kpini][jpini][ipini];
@@ -3142,30 +3107,20 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 			//Fpz[particle] = (1/4)*pi*pow((diameter_particle),3)*dpdz[particle];
 
 
-			Fpx[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdx[particle]*density_particle*pow(v_scale,2);
-			Fpy[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdy[particle]*density_particle*pow(v_scale,2);
-			Fpz[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdz[particle]*density_particle*pow(v_scale,2);
+			Fpx[particle] = (0.25)*3.14*pow((0.001),3)*dpdx[particle];
+			Fpy[particle] = (0.25)*3.14*pow((0.001),3)*dpdy[particle];
+			Fpz[particle] = (0.25)*3.14*pow((0.001),3)*dpdz[particle];
 
                         //printf("pi = %e\n", Fpx[particle]);
 
 			//Fp[particle]  = sqrt(pow(Fpx[particle],2) + pow(Fpy[particle],2) + pow(Fpz[particle],2));
 
-
 			// Buoyancy Force
+
 			//Fb[particle] = (1/6)*pi*pow((diameter_particle),3)*(density_particle - density_fluid)*gravity;
-			Fbx[particle] = 0;
-			Fby[particle] = 0;
-                 	Fbz[particle] = (0.166)*3.14*pow((diameter_particle),3)*(density_particle - density_fluid)*9.81;
 
-                        // acceleration of particle
-			acceleration_x[particle] = (Fpx[particle] + Fbx[particle])/mass_particle;
-			acceleration_y[particle] = (Fpy[particle] + Fby[particle])/mass_particle;
-			acceleration_z[particle] = (Fpz[particle] + Fbz[particle])/mass_particle;
+			Fb[particle] = (0.166)*3.14*pow((0.001),3)*(2500 - density_fluid)*9.81;
 
-                        // particle velocity (with mass)
-			uploc[particle] = uploc[particle] + acceleration_x[particle]*tsteps*nondtsteps + random_vel_x;
-			vploc[particle] = vploc[particle] + acceleration_y[particle]*tsteps*nondtsteps + random_vel_y;
-			wploc[particle] = wploc[particle] + acceleration_z[particle]*tsteps*nondtsteps + random_vel_z;
 
                         //printf("pi = %d\n", density_fluid);
 
@@ -3190,25 +3145,25 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 
 
 
-/*
+
 			
 			//PetscPrintf(PETSC_COMM_WORLD, "Dathi \n");
 			
 			// Find next location and check if its inside the pipe
  			
-			//PetscReal xpite_forcast, ypite_forcast, zpite_forcast;
+			PetscReal xpite_forcast, ypite_forcast, zpite_forcast;
 
 
-			//xpite_forcast = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
-		        //ypite_forcast = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
-			//zpite_forcast = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
+			xpite_forcast = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
+		        ypite_forcast = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
+			zpite_forcast = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
 
 			//centroid of the plane
 			
-			//PetscReal X_centroid=0, Y_centroid=0, Z_centroid=0;
-			//PetscReal X_C = 0, Y_C = 0, Z_C = 0;
+			PetscReal X_centroid=0, Y_centroid=0, Z_centroid=0;
+			PetscReal X_C = 0, Y_C = 0, Z_C = 0;
 
-			//for (j=lys; j<lye; j++) {
+			for (j=lys; j<lye; j++) {
 				for (i=lxs; i<lxe; i++) {
 
 					X_C = X_C + gcoor[kpini][j  ][i  ].x;
@@ -3306,17 +3261,13 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 						zpite[particle] = zploc[particle];
 			}
 
-*/
 
-	                // position for massless
-			xpite[particle] = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
-		        ypite[particle] = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
-			zpite[particle] = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
+ 
+			//xpite[particle] = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
+		        //ypite[particle] = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
+			//zpite[particle] = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
 
-                        // position with mass
-			//xpite[particle] = xploc[particle] + uploc[particle]*tsteps*T_physical;
-		        //ypite[particle] = yploc[particle] + vploc[particle]*tsteps*T_physical;
-			//zpite[particle] = zploc[particle] + wploc[particle]*tsteps*T_physical;
+
 
 			// pressure at next location
 			
@@ -3324,7 +3275,7 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 			
 			pressure_pnew[particle] = presuure_ploc_x[particle];
 
-			//printf("something\n");
+			printf("something\n");
 		
 
 
@@ -3377,7 +3328,7 @@ PetscErrorCode Step_Injection(UserCtx *user, PetscInt ti, PetscInt tis, PetscInt
 
 			PetscPrintf(PETSC_COMM_WORLD, "TRACING DONE FOR PARTICLE #%i\n", particle);
 
-			PetscFPrintf(PETSC_COMM_WORLD, fblock, "%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e\n", xploc[particle], yploc[particle], zploc[particle], uploc[particle], vploc[particle], wploc[particle], presuure_ploc_x[particle], dpdx[particle], dpdy[particle], dpdz[particle], Fpx[particle], Fpy[particle], Fpz[particle], Fbx[particle], Fby[particle], Fbz[particle]);
+			PetscFPrintf(PETSC_COMM_WORLD, fblock, "%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e\n", xploc[particle], yploc[particle], zploc[particle], uploc[particle], vploc[particle], wploc[particle], presuure_ploc_x[particle], dpdx[particle], dpdy[particle], dpdz[particle], Fpx[particle], Fpy[particle], Fpz[particle], Fb[particle]);
 
 
 		//	PetscPrintf(PETSC_COMM_WORLD," Dathi is heere! ..\n");
@@ -3436,18 +3387,9 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 	PetscReal   *pressure_pnew;
 	PetscReal   *dpdcsi, *dpdeta, *dpdzet;
 	PetscReal    *dpdx, *dpdy, *dpdz, *delp;
-	PetscReal   *Fpx, *Fpy, *Fpz,*Fp, *Fbx, *Fby, *Fbz;
-	PetscReal    v_scale, density_particle, diameter_particle, density_fluid, mass_particle, T_physical;
-	PetscReal    *acceleration_x, *acceleration_y, *acceleration_z;
+	PetscReal   *Fpx, *Fpy, *Fpz,*Fp, *Fb;
 
-
-	v_scale = 5.5;
-	density_particle = 1602;
-	diameter_particle = 200e-6;
-	density_fluid = 10e-5;
-	mass_particle = 6.7104e-9;
-	T_physical = 3.694e-4;
-
+	PetscInt     density_fluid;
 
 	PetscInt    speedscale;
 	// Velocity scale = 3.937 m/s
@@ -3558,9 +3500,8 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fp);
 
 
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fbx);
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fby);
-		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fbz);
+		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscReal), &Fb);
+
 
 		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscInt), &ip);
 		PetscMalloc(NUM_OF_PARTICLE*sizeof(PetscInt), &jp);
@@ -3701,9 +3642,9 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 				PetscReal random_vel_z;
 
 
-				//uploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].x; //+ random_vel_x;
-				//vploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].y; //+ random_vel_y;
-				//wploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].z; //+ random_vel_z;
+				uploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].x + random_vel_x;
+				vploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].y + random_vel_y;
+				wploc[particle] = ucat[kp[particle]][jp[particle]][ip[particle]].z + random_vel_z;
 
 				presuure_ploc_x[particle] = pr[kp[particle]][jp[particle]][ip[particle]];
 
@@ -3720,139 +3661,11 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 			dpdz[particle] = dpdcsi[particle]*csi[kp[particle]][jp[particle]][ip[particle]].z + dpdeta[particle]*eta[kp[particle]][jp[particle]][ip[particle]].z + dpdzet[particle]*zet[kp[particle]][jp[particle]][ip[particle]].z;
 
 
-			//Fpx[particle] = (0.25)*3.14*pow((0.001),3)*dpdx[particle];
-			//Fpy[particle] = (0.25)*3.14*pow((0.001),3)*dpdy[particle];
-			//Fpz[particle] = (0.25)*3.14*pow((0.001),3)*dpdz[particle];
+			Fpx[particle] = (0.25)*3.14*pow((0.001),3)*dpdx[particle];
+			Fpy[particle] = (0.25)*3.14*pow((0.001),3)*dpdy[particle];
+			Fpz[particle] = (0.25)*3.14*pow((0.001),3)*dpdz[particle];
 
-			Fpx[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdx[particle]*density_particle*pow(v_scale,2);
-			Fpy[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdy[particle]*density_particle*pow(v_scale,2);
-			Fpz[particle] = (0.25)*3.14*pow((diameter_particle),3)*dpdz[particle]*density_particle*pow(v_scale,2);
-
-			//Fb[particle] = (0.166)*3.14*pow((0.001),3)*(2500 - density_fluid)*9.81;
-			Fbx[particle] = 0;
-			Fby[particle] = 0;
-                 	Fbz[particle] = (0.166)*3.14*pow((diameter_particle),3)*(density_particle - density_fluid)*9.81;
-
-			acceleration_x[particle] = (Fpx[particle] + Fbx[particle])/mass_particle;
-			acceleration_y[particle] = (Fpy[particle] + Fby[particle])/mass_particle;
-			acceleration_z[particle] = (Fpz[particle] + Fbz[particle])/mass_particle;
-
-			uploc[particle] = uploc[particle] + acceleration_x[particle]*tsteps*nondtsteps + random_vel_x;
-			vploc[particle] = vploc[particle] + acceleration_y[particle]*tsteps*nondtsteps + random_vel_y;
-			wploc[particle] = wploc[particle] + acceleration_z[particle]*tsteps*nondtsteps + random_vel_z;
-
-
-
-			PetscReal xpite_forcast, ypite_forcast, zpite_forcast;
-
-
-                        xpite_forcast = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
-                        ypite_forcast = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
-                        zpite_forcast = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
-
-                        //centroid of the plane
-
-                        PetscReal X_centroid=0, Y_centroid=0, Z_centroid=0;
-                        PetscReal X_C = 0, Y_C = 0, Z_C = 0;
-
-                        for (j=lys; j<lye; j++) {
-                                for (i=lxs; i<lxe; i++) {
-
-                                        X_C = X_C + gcoor[kp[particle]][j  ][i  ].x;
-
-                                        Y_C = Y_C + gcoor[kp[particle]][j  ][i  ].y;
-
-                                        Z_C = Z_C + gcoor[kp[particle]][j  ][i  ].z;
-
-
-                                }
-                        }
-
-                        X_centroid = X_C/((lye-lys)*(lxe-lxs));
-                        Y_centroid = Y_C/((lye-lys)*(lxe-lxs));
-                        Z_centroid = Z_C/((lye-lys)*(lxe-lxs));
-
-                        // Projection
-                        PetscReal vector_x=0,vector_y=0,vector_z=0;
-
-                        vector_x = xpite_forcast - X_centroid;
-
-                        vector_y = ypite_forcast - Y_centroid;
-
-			vector_z = zpite_forcast - Z_centroid;
-
-
-
-			PetscReal normal_x=0,normal_y=0,normal_z=0,distance=0,radius_pipe=0.05;
-
-                        //normal_x  = zet[kpini][j][i].x/sqrt(pow(zet[kpini][j][i].x,2)+pow(zet[kpini][j][i].y,2)+pow(zet[kpini][j][i].z,2));
-
-                        //normal_y  = zet[kpini][j][i].y/sqrt(pow(zet[kpini][j][i].x,2)+pow(zet[kpini][j][i].y,2)+pow(zet[kpini][j][i].z,2));
-
-                        //normal_z  = zet[kpini][j][i].z/sqrt(pow(zet[kpini][j][i].x,2)+pow(zet[kpini][j][i].y,2)+pow(zet[kpini][j][i].z,2));
-
-
-                        normal_x  = zet[k][j][i].x/sqrt(pow(zet[k][j][i].x,2)+pow(zet[k][j][i].y,2)+pow(zet[k][j][i].z,2));
-
-                        normal_y  = zet[k][j][i].y/sqrt(pow(zet[k][j][i].x,2)+pow(zet[k][j][i].y,2)+pow(zet[k][j][i].z,2));
-
-                        normal_z  = zet[k][j][i].z/sqrt(pow(zet[k][j][i].x,2)+pow(zet[k][j][i].y,2)+pow(zet[k][j][i].z,2));
-
-                        distance = vector_x*normal_x + vector_y*normal_y + vector_z*normal_z;
-
-
-                        printf("dist=%le",distance);
-
-                        //printf("d = %le",distance);
-
-
-                        //Projected point
-                        PetscReal Pp_x,Pp_y,Pp_z,Op_x,Op_y,Op_z;
-                        //
-
-
-                        Pp_x = distance*normal_x;
-
-                        Pp_y = distance*normal_y;
-
-                        Pp_z = distance*normal_z;
-
-			Op_x = vector_x - Pp_x;
-
-                        Op_y = vector_y - Pp_y;
-
-                        Op_z = vector_z - Pp_z;
-
-                        float radial_distance = sqrt(Op_x*Op_x + Op_y*Op_y + Op_z*Op_z);
-
-
-                        //radial_distance = sqrt(Op_x[particle]*Op_x[particle] + Op_y[particle]*Op_y[particle] + Op_z[particle]*Op_z[particle]);
-
-
-                        //printf("kpini=%d, X_centroid = %le, Y_centroid= %le, Z_centroid= %le, lye= %d, lxe =%d ", kpini,X_centroid,Y_centroid,Z_centroid,lye,lxe);
-
-                        printf("radial_distance = %le",radial_distance);
-
-
-                        if(radial_distance<radius_pipe){
-
-                                                xpite[particle] = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
-                                                ypite[particle] = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
-                                                zpite[particle] = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
-                        }
-
-                        else {
-
-                                                xpite[particle] = xploc[particle] + uploc[particle];
-                                                ypite[particle] = yploc[particle] + vploc[particle];
-                                                zpite[particle] = zploc[particle] + wploc[particle];
-                        }
-
-
-
-
-
-
+			Fb[particle] = (0.166)*3.14*pow((0.001),3)*(2500 - density_fluid)*9.81;
 
 			}
 			else {
@@ -3889,9 +3702,9 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 				*/
 
 			// Find next location
-			//xpite[particle] = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
-			//ypite[particle] = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
-			//zpite[particle] = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
+			xpite[particle] = xploc[particle] + uploc[particle]*tsteps*nondtsteps*speedscale;
+			ypite[particle] = yploc[particle] + vploc[particle]*tsteps*nondtsteps*speedscale;
+			zpite[particle] = zploc[particle] + wploc[particle]*tsteps*nondtsteps*speedscale;
 
 			// Saving calculated values into global UserCtx
 			user[bi].xploc[particle] = xploc[particle];
@@ -3936,7 +3749,7 @@ PetscErrorCode Step_TimeIteration(UserCtx *user, PetscInt ti, PetscInt tis, Pets
 
 			//PetscFPrintf(PETSC_COMM_WORLD, fblock, "%e,%e,%e,%e,%e,%e,%e\n", xploc[particle], yploc[particle], zploc[particle], uploc[particle], vploc[particle], wploc[particle],presuure_ploc_x[particle]);
 
-			PetscFPrintf(PETSC_COMM_WORLD, fblock, "%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e\n", xploc[particle], yploc[particle], zploc[particle], uploc[particle], vploc[particle], wploc[particle], presuure_ploc_x[particle], dpdx[particle], dpdy[particle], dpdz[particle], Fpx[particle], Fpy[particle], Fpz[particle], Fbx[particle], Fby[particle], Fbz[particle]);
+			PetscFPrintf(PETSC_COMM_WORLD, fblock, "%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e,%e\n", xploc[particle], yploc[particle], zploc[particle], uploc[particle], vploc[particle], wploc[particle], presuure_ploc_x[particle], dpdx[particle], dpdy[particle], dpdz[particle], Fpx[particle], Fpy[particle], Fpz[particle], Fb[particle]);
 
 
 		} // End of particle loop
